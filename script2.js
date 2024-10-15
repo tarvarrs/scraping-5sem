@@ -49,7 +49,7 @@ const url = 'https://www.zdf.de/nachrichten/thema/landtagswahl-thueringen-116.ht
 
 parser(url).then(articles => {
     if (articles && articles.length > 0) {
-        saveDataToXML(articles, 'zdf-articles.xml');
+        saveDataToXML(articles, 'data/zdf-articles.xml');
     } else {
         console.log('No articles found.');
     }

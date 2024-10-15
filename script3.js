@@ -53,7 +53,7 @@ const url = 'https://www.nytimes.com/spotlight/german';
 
 parser(url).then(articles => {
     if (articles && articles.length > 0) {
-        saveDataToXML(articles, 'nytimes-articles.xml');
+        saveDataToXML(articles, 'data/nytimes-articles.xml');
     } else {
         console.log('No articles found.');
     }

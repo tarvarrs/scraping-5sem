@@ -53,7 +53,7 @@ const url = 'https://www.deutschland.de/de/news';
 
 parser(url).then(articles => {
     if (articles && articles.length > 0) {
-        saveDataToXML(articles, 'deutschland-articles.xml');
+        saveDataToXML(articles, 'data/deutschland-articles.xml');
     } else {
         console.log('No articles found.');
     }

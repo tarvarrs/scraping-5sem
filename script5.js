@@ -49,7 +49,7 @@ const url = 'https://de.rt.com';
 
 parser(url).then(articles => {
     if (articles && articles.length > 0) {
-        saveDataToXML(articles, 'de-rt-articles.xml');
+        saveDataToXML(articles, 'data/de-rt-articles.xml');
     } else {
         console.log('No articles found.');
     }

@@ -49,7 +49,7 @@ const url = 'https://www.nachrichtenleicht.de/nachrichtenleicht-nachrichten-100.
 
 parser(url).then(articles => {
     if (articles && articles.length > 0) {
-        saveDataToXML(articles, 'nachrichtenleicht-articles.xml');
+        saveDataToXML(articles, 'data/nachrichtenleicht-articles.xml');
     } else {
         console.log('No articles found.');
     }
