@@ -5,20 +5,6 @@ const fs = require('fs');
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-async function appendDataToXML(data, outputFile) {
-    const builder = new Builder({ rootName: 'articles', xmldec: { version: '1.0', encoding: 'UTF-8' }, headless: true });
-    const xmlData = builder.buildObject({
-        article: data.map(item => ({
-            title: item.title,
-            description: item.description,
-            category: item.category
-        }))
-    });
-
-    fs.appendFileSync(outputFile, xmlData, 'utf8');
-    console.log(`Данные добавлены в ${outputFile}`);
-}
-
 async function parser(url, outputFile) {
     const browser = await puppeteer.launch();
     const page = await browser.newPage();
@@ -68,10 +54,24 @@ async function parser(url, outputFile) {
         }
 
     } catch (error) {
-        console.error(`Ошибка при парсинге: ${error.message}`);
+        console.error(`Error scraping news from ${url}:`, error.message);
     } finally {
         await browser.close();
     }
+}
+
+async function appendDataToXML(data, outputFile) {
+    const builder = new Builder({ rootName: 'articles', xmldec: { version: '1.0', encoding: 'UTF-8' }, headless: true });
+    const xmlData = builder.buildObject({
+        article: data.map(item => ({
+            title: item.title,
+            description: item.description,
+            category: item.category
+        }))
+    });
+
+    fs.appendFileSync(outputFile, xmlData, 'utf8');
+    console.log(`Data added to ${outputFile}`);
 }
 
 const url = 'https://www.deutschland.de/de/news';
@@ -81,5 +81,5 @@ fs.writeFileSync(outputFile, '<?xml version="1.0" encoding="UTF-8"?><articles>',
 
 parser(url, outputFile).then(() => {
     fs.appendFileSync(outputFile, '</articles>', 'utf8');
-    console.log('Парсинг завершен и данные сохранены в articles.xml');
+    console.log('Data saved to xml file.');
 });

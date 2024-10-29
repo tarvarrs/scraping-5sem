@@ -15,7 +15,7 @@ async function appendDataToXML(data, outputFile) {
     });
 
     fs.appendFileSync(outputFile, xmlData, 'utf8');
-    console.log(`Данные добавлены в ${outputFile}`);
+    console.log(`Data added to ${outputFile}`);
 }
 
 async function parser(url, outputFile) {
@@ -64,7 +64,7 @@ async function parser(url, outputFile) {
         }
 
     } catch (error) {
-        console.error(`Ошибка при парсинге: ${error.message}`);
+        console.error(`Error scraping news from ${url}:`, error.message);
     } finally {
         await browser.close();
     }
@@ -77,5 +77,5 @@ fs.writeFileSync(outputFile, '<?xml version="1.0" encoding="UTF-8"?><articles>',
 
 parser(url, outputFile).then(() => {
     fs.appendFileSync(outputFile, '</articles>', 'utf8');
-    console.log('Парсинг завершен и данные сохранены в articles.xml');
+    console.log('Data saved to xml file.');
 });
