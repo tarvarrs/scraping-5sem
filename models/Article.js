@@ -1,25 +1,20 @@
-const { DataTypes } = require('sequelize');
-const sequelize = require('./index');
+const { Model, DataTypes } = require('sequelize');
+const Source = require('./Source');
 
-const Article = sequelize.define('Article', {
-  title: {
-    type: DataTypes.STRING,
-    allowNull: true,
-  },
-  description: {
-    type: DataTypes.TEXT,
-    allowNull: true,
-  },
-  category: {
-    type: DataTypes.STRING,
-    allowNull: true,
-  },
-  author: {
-    type: DataTypes.STRING,
-    allowNull: true,
-  }
-}, {
-  timestamps: true, // createdAt, updatedAt
-});
+module.exports = (sequelize) => {
+  class Article extends Model {}
 
-module.exports = Article;
+  Article.init({
+      title: DataTypes.STRING,
+      description: DataTypes.TEXT,
+      category: DataTypes.STRING,
+      author: DataTypes.STRING
+  }, {
+      sequelize,
+      modelName: 'Article',
+      tableName: 'articles'
+  });
+
+  Article.belongsTo(Source(sequelize), { foreignKey: 'sourceId', as: 'source' });
+  return Article;
+};

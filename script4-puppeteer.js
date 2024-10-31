@@ -1,54 +1,52 @@
 const puppeteer = require('puppeteer');
 const cheerio = require('cheerio');
-const { Builder } = require('xml2js');
-const fs = require('fs');
+const { Article, Source } = require('./models');
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-async function appendDataToXML(data, outputFile) {
-    const builder = new Builder({ rootName: 'articles', xmldec: { version: '1.0', encoding: 'UTF-8' } });
-    const xmlData = builder.buildObject({
-        article: data.map(item => ({
-            title: item.title,
-            description: item.description
-        }))
-    });
-
-    fs.appendFileSync(outputFile, xmlData, 'utf8');
-    console.log(`Data added to ${outputFile}`);
-}
-
-async function parser(url, outputFile) {
+async function parser(url) {
     const browser = await puppeteer.launch();
     const page = await browser.newPage();
     await page.goto(url, { waitUntil: 'networkidle2' });
 
-    let articles = [];
     let moreButtonExists = true;
     let clickCount = 0;
     const maxClicks = 40;
+    let processedCount = 0;
 
     try {
+        let source = await Source.findOne({ where: { url } });
+        if (!source) {
+        source = await Source.create({ url, name: 'Nachrichtenleicht' });
+    }
+        const sourceId = source.id;
+
         while (moreButtonExists && clickCount < maxClicks) {
             const content = await page.content();
             const $ = cheerio.load(content);
 
+            const articles = [];
             const titleSelector = 'h2.b-headline.teaser-large-headline, h2.b-headline.teaser-wide-headline';
             const descriptionSelector = 'p.teaser-large-description, p.teaser-wide-description';
 
-            $('.teaser-wide-content, .teaser-large-content').each((index, element) => {
+            $('.teaser-wide-content, .teaser-large-content').slice(processedCount).each((index, element) => {
                 const title = $(element).find(titleSelector).text().trim();
                 const description = $(element).find(descriptionSelector).text().trim();
 
-                articles.push({
-                    title,
-                    description
-                });
+                if (title) {
+                    articles.push({
+                        title,
+                        description,
+                        sourceId
+                    });
+                }
             });
 
-            await appendDataToXML(articles, outputFile);
+            for (const article of articles) {
+                await Article.create(article);
+            }
 
-            articles = [];
+            processedCount += articles.length;
 
             moreButtonExists = await page.evaluate(() => {
                 const button = document.querySelector('.content-loader-btn-more.js-load-more-button');
@@ -71,11 +69,6 @@ async function parser(url, outputFile) {
 }
 
 const url = 'https://www.nachrichtenleicht.de/nachrichtenleicht-nachrichten-100.html';
-const outputFile = 'data/nachrichtenleicht-articles-v2.xml';
-
-fs.writeFileSync(outputFile, '<?xml version="1.0" encoding="UTF-8"?><articles>', 'utf8');
-
-parser(url, outputFile).then(() => {
-    fs.appendFileSync(outputFile, '</articles>', 'utf8');
-    console.log('Data saved to xml file.');
+parser(url).then(() => {
+    console.log('Data scraping and saving completed.');
 });

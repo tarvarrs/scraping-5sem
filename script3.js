@@ -1,12 +1,17 @@
 const superagent = require('superagent');
 const cheerio = require('cheerio');
-const { Builder } = require('xml2js');
-const fs = require('fs');
+const { Article, Source } = require('./models');
 
 async function parser(url) {
     try {
+        // Проверяем и создаем источник в базе данных
+        let source = await Source.findOne({ where: { url } });
+        if (!source) {
+            source = await Source.create({ url, name: 'The New York Times' });
+        }
+        const sourceId = source.id;
+
         const response = await superagent.get(url);
-        
         const $ = cheerio.load(response.text);
 
         const articles = [];
@@ -15,46 +20,33 @@ async function parser(url) {
         const descriptionSelector = 'p.css-1pga48a.e15t083i1';
         const authorSelector = 'span.css-1n7hynb';
 
+        // Извлечение статей с запоминанием источника
         $('.css-14ee9cx').each((index, element) => {
             const title = $(element).find(titleSelector).text().trim();
             const description = $(element).find(descriptionSelector).text().trim();
             const author = $(element).find(authorSelector).text().trim();
 
-            articles.push({
-                title,
-                description,
-                author,
-            });
+            if (title) {
+                articles.push({
+                    title,
+                    description,
+                    author,
+                    sourceId
+                });
+            }
         });
 
-        return articles;
+        // Сохранение статей в базу данных
+        for (const article of articles) {
+            await Article.create(article);
+        }
+
+        console.log('Data scraping and saving completed.');
 
     } catch (error) {
         console.error(`Error scraping news from ${url}:`, error.message);
     }
 }
 
-async function saveDataToXML(data, outputFile) {
-    const builder = new Builder({ rootName: 'articles', xmldec: { version: '1.0', encoding: 'UTF-8' } });
-
-    const xmlData = builder.buildObject({
-        article: data.map(item => ({
-            title: item.title,
-            description : item.description,
-            author: item.author,
-        }))
-    });
-
-    fs.writeFileSync(outputFile, xmlData, 'utf8');
-    console.log(`Data saved to ${outputFile}`);
-}
-
 const url = 'https://www.nytimes.com/spotlight/german';
-
-parser(url).then(articles => {
-    if (articles && articles.length > 0) {
-        saveDataToXML(articles, 'data/nytimes-articles.xml');
-    } else {
-        console.log('No articles found.');
-    }
-});
+parser(url);

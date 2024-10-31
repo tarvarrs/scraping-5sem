@@ -1,12 +1,11 @@
 const superagent = require('superagent');
 const cheerio = require('cheerio');
-const { Builder } = require('xml2js');
-const fs = require('fs');
+const { Article, Source } = require('./models');
 
 async function parser(url) {
     try {
         const response = await superagent.get(url);
-        
+
         const $ = cheerio.load(response.text);
 
         const articles = [];
@@ -31,25 +30,28 @@ async function parser(url) {
     }
 }
 
-async function saveDataToXML(data, outputFile) {
-    const builder = new Builder({ rootName: 'articles', xmldec: { version: '1.0', encoding: 'UTF-8' } });
-
-    const xmlData = builder.buildObject({
-        article: data.map(item => ({
-            title: item.title,
-            category: item.category
-        }))
-    });
-
-    fs.writeFileSync(outputFile, xmlData, 'utf8');
-    console.log(`Data saved to ${outputFile}`);
+async function saveArticles(articles, sourceId) {
+    for (const article of articles) {
+        await Article.create({
+            title: article.title,
+            category: article.category,
+            sourceId
+        });
+    }
+    console.log(`Saved ${articles.length} articles to the database.`);
 }
 
 const url = 'https://de.rt.com';
 
-parser(url).then(articles => {
+parser(url).then(async articles => {
     if (articles && articles.length > 0) {
-        saveDataToXML(articles, 'data/de-rt-articles.xml');
+        let source = await Source.findOne({ where: { url } });
+        if (!source) {
+            source = await Source.create({ url, name: 'RT DE' });
+        }
+        const sourceId = source.id;
+
+        await saveArticles(articles, sourceId);
     } else {
         console.log('No articles found.');
     }

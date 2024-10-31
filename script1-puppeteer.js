@@ -1,44 +1,55 @@
 const puppeteer = require('puppeteer');
 const cheerio = require('cheerio');
-const { Builder } = require('xml2js');
-const fs = require('fs');
+const { Article, Source } = require('./models');
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-async function parser(url, outputFile) {
+async function parser(url) {
     const browser = await puppeteer.launch();
     const page = await browser.newPage();
-    await page.goto(url, { waitUntil: 'networkidle2' });
+    await page.goto(url, { waitUntil: 'load' });
 
-    let articles = [];
     let moreButtonExists = true;
     let clickCount = 0;
     const maxClicks = 13;
+    let processedCount = 0;
 
     try {
+        let source = await Source.findOne({ where: { url } });
+        if (!source) {
+            source = await Source.create({ url, name: 'Deutschland News' });
+        }
+        const sourceId = source.id;
+
         while (moreButtonExists && clickCount < maxClicks) {
             const content = await page.content();
             const $ = cheerio.load(content);
 
+            const articles = [];
             const titleSelector = 'div.teaser-small__headline, div.article-teaser-big__headline';
             const categorySelector = 'div.teaser-small__tagline, div.article-teaser-big__tagline';
             const descriptionSelector = 'div.teaser-small__summary, div.article-teaser-big__summary';
 
-            $('.component').each((index, element) => {
+            $('.component').slice(processedCount).each((index, element) => {
                 const title = $(element).find(titleSelector).text().trim();
                 const category = $(element).find(categorySelector).text().trim();
                 const description = $(element).find(descriptionSelector).text().trim();
 
-                articles.push({
-                    title,
-                    category,
-                    description
-                });
+                if (title) {
+                    articles.push({
+                        title,
+                        category,
+                        description,
+                        sourceId
+                    });
+                }
             });
 
-            await appendDataToXML(articles, outputFile);
+            for (const article of articles) {
+                await Article.create(article);
+            }
 
-            articles = [];
+            processedCount += articles.length;
 
             moreButtonExists = await page.evaluate(() => {
                 const button = document.querySelector('button[data-label="Weitere Artikel anzeigen"]');
@@ -50,7 +61,7 @@ async function parser(url, outputFile) {
             });
 
             clickCount++;
-            await delay(3000);
+            await delay(1000);
         }
 
     } catch (error) {
@@ -60,26 +71,7 @@ async function parser(url, outputFile) {
     }
 }
 
-async function appendDataToXML(data, outputFile) {
-    const builder = new Builder({ rootName: 'articles', xmldec: { version: '1.0', encoding: 'UTF-8' }, headless: true });
-    const xmlData = builder.buildObject({
-        article: data.map(item => ({
-            title: item.title,
-            description: item.description,
-            category: item.category
-        }))
-    });
-
-    fs.appendFileSync(outputFile, xmlData, 'utf8');
-    console.log(`Data added to ${outputFile}`);
-}
-
 const url = 'https://www.deutschland.de/de/news';
-const outputFile = 'data/deutschland-articles-v2.xml';
-
-fs.writeFileSync(outputFile, '<?xml version="1.0" encoding="UTF-8"?><articles>', 'utf8');
-
-parser(url, outputFile).then(() => {
-    fs.appendFileSync(outputFile, '</articles>', 'utf8');
-    console.log('Data saved to xml file.');
+parser(url).then(() => {
+    console.log('Data scraping and saving completed.');
 });
