@@ -17,10 +17,12 @@ async function parser(url) {
             const title = $(element).find(titleSelector).text().trim();
             const category = $(element).find(categorySelector).text().trim();
 
-            articles.push({
-                title,
-                category
-            });
+            if (title){
+                articles.push({
+                    title,
+                    category
+                });
+            };
         });
 
         return articles;
@@ -32,13 +34,21 @@ async function parser(url) {
 
 async function saveArticles(articles, sourceId) {
     for (const article of articles) {
-        await Article.create({
-            title: article.title,
-            category: article.category,
-            sourceId
+        const is_exist = await Article.findOne({
+            where: {
+                title: article.title,
+                sourceId
+            }
         });
+        if (!is_exist){
+            await Article.create({
+                title: article.title,
+                category: article.category,
+                sourceId
+            });
+        }
     }
-    console.log(`Saved ${articles.length} articles to the database.`);
+    console.log(`Saved articles to the database.`);
 }
 
 const url = 'https://de.rt.com';

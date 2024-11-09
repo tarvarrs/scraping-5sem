@@ -46,7 +46,15 @@ async function parser(url) {
             });
 
             for (const article of articles) {
-                await Article.create(article);
+                const is_exist = await Article.findOne({
+                    where: {
+                        title: article.title,
+                        sourceId
+                    }
+                });
+                if (!is_exist){
+                    await Article.create(article);
+                };
             }
 
             processedCount += articles.length;

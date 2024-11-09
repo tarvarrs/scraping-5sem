@@ -4,7 +4,6 @@ const { Article, Source } = require('./models');
 
 async function parser(url) {
     try {
-        // Проверяем и создаем источник в базе данных
         let source = await Source.findOne({ where: { url } });
         if (!source) {
             source = await Source.create({ url, name: 'The New York Times' });
@@ -20,7 +19,6 @@ async function parser(url) {
         const descriptionSelector = 'p.css-1pga48a.e15t083i1';
         const authorSelector = 'span.css-1n7hynb';
 
-        // Извлечение статей с запоминанием источника
         $('.css-14ee9cx').each((index, element) => {
             const title = $(element).find(titleSelector).text().trim();
             const description = $(element).find(descriptionSelector).text().trim();
@@ -36,9 +34,16 @@ async function parser(url) {
             }
         });
 
-        // Сохранение статей в базу данных
         for (const article of articles) {
-            await Article.create(article);
+            const is_exist = await Article.findOne({
+                where: {
+                    title: article.title,
+                    sourceId
+                }
+            });
+            if (!is_exist){
+                await Article.create(article);
+            };
         }
 
         console.log('Data scraping and saving completed.');

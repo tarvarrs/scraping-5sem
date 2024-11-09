@@ -32,7 +32,7 @@ async function parser(url) {
             $('.teaser-wide-content, .teaser-large-content').slice(processedCount).each((index, element) => {
                 const title = $(element).find(titleSelector).text().trim();
                 const description = $(element).find(descriptionSelector).text().trim();
-
+                
                 if (title) {
                     articles.push({
                         title,
@@ -43,7 +43,15 @@ async function parser(url) {
             });
 
             for (const article of articles) {
-                await Article.create(article);
+                const is_exist = await Article.findOne({
+                    where: {
+                        title: article.title,
+                        sourceId
+                    }
+                });
+                if (!is_exist){
+                    await Article.create(article);
+                };
             }
 
             processedCount += articles.length;
