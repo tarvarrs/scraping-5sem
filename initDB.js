@@ -1,4 +1,4 @@
-const { sequelize, Article, Source } = require('./models');
+const { sequelize, Article, Source, Status } = require('./models');
 
 (async () => {
   try {
