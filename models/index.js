@@ -6,9 +6,11 @@ const sequelize = new Sequelize({
 
 const Article = require('./Article')(sequelize);
 const Source = require('./Source')(sequelize);
+const Status = require('./Status')(sequelize);
 
 module.exports = {
     sequelize,
     Article,
-    Source
+    Source,
+    Status
 };
