@@ -1,8 +1,9 @@
 const superagent = require('superagent');
 const cheerio = require('cheerio');
-const { Article, Source } = require('./models');
+const { Article, Source, Status } = require('./models');
 
 async function parser(url) {
+    const taskStatus = await updateTaskStatus(2, 'parsing-news', 'in_progress');
     try {
         let source = await Source.findOne({ where: { url } });
         if (!source) {
@@ -42,12 +43,39 @@ async function parser(url) {
                 await Article.create(article);
             };
         }
-        
+        await markTaskCompleted(taskStatus, 'Task completed successfully.');
         console.log('Data scraping and saving completed.');
 
     } catch (error) {
         console.error(`Error scraping news from ${url}:`, error.message);
+        await markTaskFailed(taskStatus, error.message);
     }
+}
+
+async function updateTaskStatus(sourceId, taskName, status, message = '') {
+    const taskStatus = await Status.create({
+        taskName,
+        status,
+        message,
+        startTime: new Date(),
+        sourceId,
+    });
+
+    return taskStatus;
+}
+
+async function markTaskCompleted(taskStatus, message = '') {
+    taskStatus.status = 'completed';
+    taskStatus.endTime = new Date();
+    taskStatus.message = message;
+    await taskStatus.save();
+}
+
+async function markTaskFailed(taskStatus, message = '') {
+    taskStatus.status = 'failed';
+    taskStatus.endTime = new Date();
+    taskStatus.message = message;
+    await taskStatus.save();
 }
 
 const url = 'https://www.zdf.de/nachrichten/thema/landtagswahl-thueringen-116.html';

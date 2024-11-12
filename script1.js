@@ -1,64 +1,115 @@
-const superagent = require('superagent');
+const puppeteer = require('puppeteer');
 const cheerio = require('cheerio');
-const { Builder } = require('xml2js');
-const fs = require('fs');
+const { Article, Source, Status } = require('./models');
+
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 async function parser(url) {
+    const taskStatus = await updateTaskStatus(1, 'parsing-news', 'in_progress'); // <-- lab 4
+    const browser = await puppeteer.launch();
+    const page = await browser.newPage();
+    await page.goto(url, { waitUntil: 'load' });
+
+    let moreButtonExists = true;
+    let clickCount = 0;
+    const maxClicks = 13;
+    let processedCount = 0;
+
     try {
-        const response = await superagent.get(url).set({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.83 Safari/537.36',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9'
-        });
-        
-        const $ = cheerio.load(response.text);
+        let source = await Source.findOne({ where: { url } }); // <-- modified to skip duplicates
+        if (!source) {
+            source = await Source.create({ url, name: 'Deutschland News' });
+        }
+        const sourceId = source.id;
 
-        const articles = [];
+        while (moreButtonExists && clickCount < maxClicks) {
+            const content = await page.content();
+            const $ = cheerio.load(content);
 
-        const titleSelector = 'div.teaser-small__headline, div.article-teaser-big__headline';
-        const categorySelector = 'div.teaser-small__tagline, div.article-teaser-big__tagline';
-        const descriptionSelector = 'div.teaser-small__summary, div.article-teaser-big__summary';
+            const articles = [];
+            const titleSelector = 'div.teaser-small__headline, div.article-teaser-big__headline';
+            const categorySelector = 'div.teaser-small__tagline, div.article-teaser-big__tagline';
+            const descriptionSelector = 'div.teaser-small__summary, div.article-teaser-big__summary';
 
-        $('.component').each((index, element) => {
-            const title = $(element).find(titleSelector).text().trim();
-            const category = $(element).find(categorySelector).text().trim();
-            const description = $(element).find(descriptionSelector).text().trim();
+            $('.component').slice(processedCount).each((index, element) => {
+                const title = $(element).find(titleSelector).text().trim();
+                const category = $(element).find(categorySelector).text().trim();
+                const description = $(element).find(descriptionSelector).text().trim();
 
-            articles.push({
-                title,
-                category,
-                description
+                if (title) {
+                    articles.push({
+                        title,
+                        category,
+                        description,
+                        sourceId
+                    });
+                }
             });
-        });
 
-        return articles;
+            for (const article of articles) {
+                const is_exist = await Article.findOne({
+                    where: {
+                        title: article.title,
+                        sourceId
+                    }
+                });
+                if (!is_exist){
+                    await Article.create(article);
+                };
+            }
 
+            processedCount += articles.length;
+
+            moreButtonExists = await page.evaluate(() => {
+                const button = document.querySelector('button[data-label="Weitere Artikel anzeigen"]');
+                if (button) {
+                    button.click();
+                    return true;
+                }
+                return false;
+            });
+
+            clickCount++;
+            await delay(1000);
+        }
+        await markTaskCompleted(taskStatus, 'Task completed successfully.');
     } catch (error) {
         console.error(`Error scraping news from ${url}:`, error.message);
+        await markTaskFailed(taskStatus, error.message);
+    } finally {
+        await browser.close();
     }
 }
 
-async function saveDataToXML(data, outputFile) {
-    const builder = new Builder({ rootName: 'articles', xmldec: { version: '1.0', encoding: 'UTF-8' } });
-
-    const xmlData = builder.buildObject({
-        article: data.map(item => ({
-            title: item.title,
-            category: item.category,
-            description: item.description
-        }))
+// lab 4
+async function updateTaskStatus(sourceId, taskName, status, message = '') {
+    const taskStatus = await Status.create({
+        taskName,
+        status,
+        message,
+        startTime: new Date(),
+        sourceId,
     });
 
-    fs.writeFileSync(outputFile, xmlData, 'utf8');
-    console.log(`Data saved to ${outputFile}`);
+    return taskStatus;
 }
 
-const url = 'https://www.deutschland.de/de/news';
+async function markTaskCompleted(taskStatus, message = '') {
+    taskStatus.status = 'completed';
+    taskStatus.endTime = new Date();
+    taskStatus.message = message;
+    await taskStatus.save();
+}
 
-parser(url).then(articles => {
-    if (articles && articles.length > 0) {
-        saveDataToXML(articles, 'data/deutschland-articles.xml');
-    } else {
-        console.log('No articles found.');
-    }
+async function markTaskFailed(taskStatus, message = '') {
+    taskStatus.status = 'failed';
+    taskStatus.endTime = new Date();
+    taskStatus.message = message;
+    await taskStatus.save();
+}
+
+
+const url = 'https://www.deutschland.de/de/news';
+parser(url).then(() => {
+    console.log('Data scraping and saving completed.');
 });
