@@ -33,7 +33,6 @@ async function parser(url) {
             $('.teaser-wide-content, .teaser-large-content').slice(processedCount).each((index, element) => {
                 const title = $(element).find(titleSelector).text().trim();
                 const description = $(element).find(descriptionSelector).text().trim();
-                
                 if (title) {
                     articles.push({
                         title,

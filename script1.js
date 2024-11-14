@@ -3,9 +3,8 @@ const cheerio = require('cheerio');
 const { Article, Source, Status } = require('./models');
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-
 async function parser(url) {
-    const taskStatus = await updateTaskStatus(1, 'parsing-news', 'in_progress'); // <-- lab 4
+    const taskStatus = await updateTaskStatus(1, 'parsing-news', 'in_progress');
     const browser = await puppeteer.launch();
     const page = await browser.newPage();
     await page.goto(url, { waitUntil: 'load' });
@@ -16,7 +15,7 @@ async function parser(url) {
     let processedCount = 0;
 
     try {
-        let source = await Source.findOne({ where: { url } }); // <-- modified to skip duplicates
+        let source = await Source.findOne({ where: { url } });
         if (!source) {
             source = await Source.create({ url, name: 'Deutschland News' });
         }
