@@ -80,7 +80,6 @@ async function parser(url) {
     }
 }
 
-// lab 4
 async function updateTaskStatus(sourceId, taskName, status, message = '') {
     const taskStatus = await Status.create({
         taskName,
